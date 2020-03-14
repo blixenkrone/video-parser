@@ -53,6 +53,9 @@ func (s *server) Routes() {
 }
 
 func (s *server) handleVideo() http.HandlerFunc {
+	type meta struct {
+		Data []byte `json:"data,omitempty"`
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		supported := SupportedSuffix(mediaType)
@@ -61,20 +64,14 @@ func (s *server) handleVideo() http.HandlerFunc {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		var video *video
+		var video video
 		mrd, err := video.RawMeta(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		s.Infof("hello")
-		// defer r.Body.Close()
-		// b, err := ioutil.ReadAll(mrd)
-		// if err != nil {
-		// 	http.Error(w, err.Error(), 500)
-		// 	return
-		// }
-		if err := json.NewEncoder(w).Encode(mrd); err != nil {
+		if err := json.NewEncoder(w).Encode(&meta{mrd}); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
