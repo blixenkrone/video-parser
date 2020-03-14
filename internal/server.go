@@ -2,9 +2,11 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"mime"
 	"net/http"
-	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -14,25 +16,30 @@ type server struct {
 	srv    *http.Server
 	router *mux.Router
 	db     *database
-	Logger
+	logger
+}
+
+type logger interface {
+	Warnf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+	Fatalf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
 }
 
 func InitServer() *server {
 	r := mux.NewRouter()
 	r.Use(recoverMw, loggerMw)
 	srv := &http.Server{
-		Addr:        ":8080",
-		Handler:     r,
-		ReadTimeout: 1 << 20,
+		Addr:              ":8080",
+		Handler:           r,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       30 * time.Second,
 	}
 
 	var db database
-	logger := &logrus.Logger{
-		Out:       os.Stdout,
-		Formatter: &logrus.JSONFormatter{},
-		Hooks:     logrus.LevelHooks{},
-		Level:     logrus.DebugLevel,
-	}
+	logger := logrus.New()
 	return &server{srv, r, &db, logger}
 }
 
@@ -48,35 +55,41 @@ func (s *server) Routes() {
 func (s *server) handleVideo() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if SupportedSuffix(mediaType) {
-
-		}
-		var video video
-		res, err := video.RawMeta(r.Body)
-		if err != nil {
-			s.Logger.Errorf("%v", err)
+		supported := SupportedSuffix(mediaType)
+		s.Infof("is supported: %v", supported)
+		if !supported {
+			http.Error(w, err.Error(), 500)
 			return
 		}
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			s.Logger.Warnf("%v", err)
+		var video *video
+		mrd, err := video.RawMeta(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		s.Infof("hello")
+		// defer r.Body.Close()
+		// b, err := ioutil.ReadAll(mrd)
+		// if err != nil {
+		// 	http.Error(w, err.Error(), 500)
+		// 	return
+		// }
+		if err := json.NewEncoder(w).Encode(mrd); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
 		}
 	}
 }
 
 /**
- * Helpers
+ * Middleware
  */
-
-type Logger interface {
-	Warnf(format string, args ...interface{})
-	Errorf(format string, args ...interface{})
-	Fatalf(format string, args ...interface{})
-}
 
 func recoverMw(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
+				fmt.Printf("%v\n", err)
 				http.Error(w, http.StatusText(500), 500)
 			}
 		}()
@@ -84,14 +97,13 @@ func recoverMw(next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(fn)
 }
+
 func loggerMw(next http.Handler) http.Handler {
-	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				http.Error(w, http.StatusText(500), 500)
-			}
-		}()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		next.ServeHTTP(w, r)
-	}
-	return http.HandlerFunc(handlerFunc)
+		log.Printf("<< %s %s %v\n", r.Method, r.URL.Path, time.Since(start))
+	})
 }
+
+// https://github.com/shimberger/gohls/blob/7c2a1cc3a0874acae3528dacca399eef3630aa5c/internal/cmd/root.go
