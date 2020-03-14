@@ -1,10 +1,8 @@
 package internal
 
 import (
-	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -44,22 +42,17 @@ func (v *video) RawMeta(r io.Reader) ([]byte, error) {
 	}
 	// cmd := exec.Command(ffprobe, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", "-hide_banner", "pipe:0")
 
-	f, err := ioutil.TempFile(os.TempDir(), "video-*")
-	if err != nil {
-		return nil, err
-	}
-	defer v.removeFile(f)
+	// f, err := ioutil.TempFile(os.TempDir(), "video-*")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer v.removeFile(f)
 
-	go io.Copy(f, r)
-	cmd := exec.Command(ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", f.Name())
+	// go io.Copy(f, r)
+	cmd := exec.Command(ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", "pipe:0")
 	spew.Dump(cmd.String())
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	if err := cmd.Run(); err != nil {
-		return nil, err
-	}
-	return out.Bytes(), nil
+	cmd.Stdin = r
+	return cmd.CombinedOutput()
 }
 
 func (v *video) RawMetaString(path string) ([]byte, error) {

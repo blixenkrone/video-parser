@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"mime"
@@ -71,10 +70,11 @@ func (s *server) handleVideo() http.HandlerFunc {
 			return
 		}
 		s.Infof("hello")
-		if err := json.NewEncoder(w).Encode(&meta{mrd}); err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
+		w.Write(mrd)
+		// if err := json.NewEncoder(w).Encode(&meta{mrd}); err != nil {
+		// 	http.Error(w, err.Error(), 500)
+		// 	return
+		// }
 	}
 }
 
