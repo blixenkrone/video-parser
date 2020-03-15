@@ -1,12 +1,17 @@
 package internal
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"mime"
 	"net/http"
 	"time"
 
+	"github.com/blixenkrone/video-parser/encoder"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -49,32 +54,51 @@ func (s *server) ListenAndServe() error {
 func (s *server) Routes() {
 	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("im ok")) }).Methods("GET")
 	s.router.HandleFunc("/api", s.handleVideo()).Methods("POST")
+	s.router.HandleFunc("/test", s.testHandler()).Methods("POST")
+}
+
+func (s *server) testHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+	}
 }
 
 func (s *server) handleVideo() http.HandlerFunc {
-	type meta struct {
-		Data []byte `json:"data,omitempty"`
+	type response struct {
+		Meta      *encoder.FFMPEGMetaOutput `json:"meta,omitempty"`
+		Thumbnail []byte                    `json:"thumbnail,omitempty"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		supported := SupportedSuffix(mediaType)
-		s.Infof("is supported: %v", supported)
+		supported := encoder.SupportedSuffix(mediaType)
 		if !supported {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, "not supported media", 500)
 			return
 		}
-		var video video
-		mrd, err := video.RawMeta(r.Body)
+		var res response
+		var buf bytes.Buffer
+		tr := io.TeeReader(r.Body, &buf)
+		defer r.Body.Close()
+
+		ffmpegOut, err := encoder.RawMeta(tr)
 		if err != nil {
+			http.Error(w, fmt.Sprintf("error getting raw meta: %v", err), 500)
+			return
+		}
+		res.Meta = ffmpegOut.SanitizeOutput()
+
+		thumb, err := encoder.Thumbnail(&buf)
+		if err != nil {
+			return
+		}
+		spew.Dump("thumb")
+		res.Thumbnail = thumb
+
+		spew.Dump(thumb)
+
+		if err := json.NewEncoder(w).Encode(&res); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		s.Infof("hello")
-		w.Write(mrd)
-		// if err := json.NewEncoder(w).Encode(&meta{mrd}); err != nil {
-		// 	http.Error(w, err.Error(), 500)
-		// 	return
-		// }
 	}
 }
 
