@@ -1,5 +1,3 @@
-github.com/byrdapp/timestamp v0.0.0-20200310151258-4659b57333bd h1:DPcXHIlHPEbwaVmPgwxBpyDbkgidPUXQcNyXj+rxR8o=
-github.com/byrdapp/timestamp v0.0.0-20200310151258-4659b57333bd/go.mod h1:3Xc+CzSMzwSXfcw/CSlFJM5HJi8afSCBliYQaYmzc1s=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gorilla/mux v1.7.4 h1:VuZ8uybHlWmqV03+zRzdwKL4tUnIp1MAQtp1mIFE1bc=
