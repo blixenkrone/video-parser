@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	VideoFormatSuffix = []string{"mp4", "mov", "quicktime", "x-m4v", "m4v"}
+	VideoFormatSuffix = []string{"mp4", "mov", "quicktime", "x-m4v", "m4v", "jpeg"}
 	fromSecondMark    = "00:00:01.000"
 	toSecondMark      = "00:00:01.100"
 )
@@ -37,7 +37,7 @@ func RawMeta(r VideoReader) (*FFMPEGMetaOutput, error) {
 	if err != nil {
 		return nil, errors.New("ffprobe no bin in $PATH")
 	}
-	cmd := exec.Command(ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", "pipe:0")
+	cmd := exec.Command(ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", "pipe:")
 	cmd.Stdin = r
 	outJSON, err := cmd.CombinedOutput()
 	if err != nil {
