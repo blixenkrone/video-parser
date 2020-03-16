@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -81,14 +82,42 @@ type FFMPEGMetaOutput struct {
 
 type FFMPEGThumbnail []byte
 
-func Thumbnail(r VideoReader) ([]byte, error) {
+func Thumbnail(r VideoReader, x, y int) (FFMPEGThumbnail, error) {
 	ffmpeg, err := exec.LookPath("ffmpeg")
 	if err != nil {
 		return nil, errors.New("ffmpeg no bin in $PATH")
 	}
-	cmd := exec.Command(ffmpeg, "-v", "quiet", "pipe:", "-vframes", "1", "pipe:")
+	f, err := ioutil.TempFile(os.TempDir(), "video-*")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		f.Close()
+		os.Remove(f.Name())
+	}()
+	// -v quiet -i ./in.mp4 -ss 00:00:01.000 -vframes 1 -s 300x300 out.jpg
+	cmd := exec.Command(ffmpeg, "-i", "pipe:", "-ss", fromSecondMark, "-to", toSecondMark, "-vframes", "1", "-s", fmt.Sprintf("%vx%v", x, y), "-f", "singlejpeg", "pipe:")
+	fmt.Println(cmd.String())
 	cmd.Stdin = r
 	return cmd.CombinedOutput()
+}
+
+func CollectedOutput(r VideoReader) (interface{}, error) {
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return nil, errors.New("ffmpeg no bin in $PATH")
+	}
+	cmd1 := exec.Command(ffmpeg, "-v", "error", "-i", "pipe:", "-ss", "00:00:01.00", "-vframes", "1", "-s", "300x300", "pipe:")
+	ffprobe, err := exec.LookPath("ffprobe")
+	if err != nil {
+		return nil, errors.New("ffprobe no bin in $PATH")
+	}
+	cmd2 := exec.Command(ffprobe, "-v", "quiet", "-print_format", "json", "-show_format", "pipe:0")
+	cmd1Stdin, _ := cmd1.StdinPipe()
+	cmd2Stdin, _ := cmd2.StdinPipe()
+	mw := io.MultiWriter(cmd1Stdin, cmd2Stdin)
+	io.Copy(mw, r)
+	return nil, nil
 }
 
 func removeFile(f *os.File) error {

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/blixenkrone/video-parser/encoder"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
@@ -52,9 +51,10 @@ func (s *server) ListenAndServe() error {
 }
 
 func (s *server) Routes() {
-	s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("im ok")) }).Methods("GET")
+	// s.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("im ok")) }).Methods("GET")
 	s.router.HandleFunc("/api", s.handleVideo()).Methods("POST")
 	s.router.HandleFunc("/test", s.testHandler()).Methods("POST")
+	s.router.PathPrefix("/").Handler(http.FileServer(http.Dir("./internal/ui/")))
 }
 
 func (s *server) testHandler() http.HandlerFunc {
@@ -65,7 +65,7 @@ func (s *server) testHandler() http.HandlerFunc {
 func (s *server) handleVideo() http.HandlerFunc {
 	type response struct {
 		Meta      *encoder.FFMPEGMetaOutput `json:"meta,omitempty"`
-		Thumbnail []byte                    `json:"thumbnail,omitempty"`
+		Thumbnail encoder.FFMPEGThumbnail   `json:"thumbnail"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -82,19 +82,14 @@ func (s *server) handleVideo() http.HandlerFunc {
 		ffmpegOut, err := encoder.RawMeta(tr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error getting raw meta: %v", err), 500)
-			return
 		}
 		res.Meta = ffmpegOut.SanitizeOutput()
 
-		thumb, err := encoder.Thumbnail(&buf)
+		thumb, err := encoder.Thumbnail(&buf, 300, 300)
 		if err != nil {
-			return
+			s.Warnf("thumbnail failed for %v : %v", mediaType, err)
 		}
-		spew.Dump("thumb")
 		res.Thumbnail = thumb
-
-		spew.Dump(thumb)
-
 		if err := json.NewEncoder(w).Encode(&res); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
